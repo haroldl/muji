@@ -1,12 +1,16 @@
 (ns muji.core
   (:gen-class))
 
+(import '(java.util.concurrent LinkedBlockingQueue TimeUnit))
 (import '(javax.sound.midi MidiSystem Sequencer Sequence Track MidiEvent MidiDevice Transmitter Receiver MidiMessage Synthesizer ShortMessage))
 
 (defn midi-message-show
   "Pretty print the details of a MidiMessage"
   [message]
-  (println (.length message) (.data message)))
+  (println { :channel (.getChannel message)
+             :command (.getCommand message)
+             :data1 (.getData1 message)
+             :data2 (.getData2 message) }))
 
 (defn midi-device-info-show
   "Pretty print the details of a MidiDevice.Info"
@@ -77,9 +81,23 @@
       (if (or (is-note-on message) (is-note-off message))
         (println name timestamp message)))))
 
+; For handing events off to the main thread.
+(def message-queue (LinkedBlockingQueue.))
+
+(defn queueing-receiver
+  "Create a Receiver that puts each incoming MidiMessage into the queue."
+  [queue]
+  (reify Receiver
+    (close [this] nil)
+    (send [this message timestamp]
+      ; NB: My Roland keyboard sends a midi event with command 240 on channel 14 at about 120 bpm.
+      (if (or (is-note-on message) (is-note-off message))
+        (.put queue message)))))
+
 (defn wire-up "" [midi-device-to-use]
   (let [transmitter (.getTransmitter midi-device-to-use)
-        receiver (printing-receiver "MIDI Receiver for Printing Messages")]
+        receiver1 (printing-receiver "MIDI Receiver for Printing Messages")
+        receiver (queueing-receiver message-queue)]
     (.setReceiver transmitter receiver)))
 
 (defn start []
@@ -93,7 +111,7 @@
   (.close input2))
 
 (defn -main
-  "I don't do a whole lot ... yet."
+  "Print out incoming MIDI note events until there's a 5 second pause between events, then exit."
   [& args]
   (println "Hello, World!")
   (let [runtime (Runtime/getRuntime)
@@ -102,4 +120,17 @@
         cores (.availableProcessors runtime)]
     (midi-devices)
     (prn #{1 2 "Hello" (vector 'free freeMem) ['cores cores] {'total totalMem}}))
-    (start))
+    (start)
+    ; Wait as long as needed for the first message.
+    (let [message (.take message-queue)]
+      (midi-message-show message))
+    (println "Got first message")
+    ; Loop until we timeout waiting for a new message.
+    (loop [n 0]
+      (let [message (.poll message-queue 5 TimeUnit/SECONDS)]
+        (if (nil? message)
+          nil
+          (do
+            (midi-message-show message)
+            (recur n)))))
+    (stop))
