@@ -49,17 +49,17 @@
     ; For input, getMaxTransmitters will be -1 (no limit), or > 0
     (not (= 0 (.getMaxTransmitters midi-device)))))
 
+(defn midi-inputs
+  "Find all input MidiDevice objects available."
+  []
+  (filter is-input-port (midi-devices)))
+
 ; Check for input ports, since the TBOX has both an input and output port with the same name for the first port.
 (defn midi-device-by-name
   "Find an input MidiDevice instance by name."
   [device-name]
   (first
-    (filter #(= device-name (.getName (.getDeviceInfo %1)))
-      (filter #(is-input-port %1)
-        (midi-devices)))))
-
-(def input1 (midi-device-by-name "MIDIPLUS TBOX 2x2"))
-(def input2 (midi-device-by-name "MIDIIN2 (MIDIPLUS TBOX 2x2)"))
+    (filter #(= device-name (.getName (.getDeviceInfo %1))) (midi-inputs))))
 
 (defn is-note-on [message]
   (and
@@ -81,9 +81,6 @@
       (if (or (is-note-on message) (is-note-off message))
         (println name timestamp message)))))
 
-; For handing events off to the main thread.
-(def message-queue (LinkedBlockingQueue.))
-
 (defn queueing-receiver
   "Create a Receiver that puts each incoming MidiMessage into the queue."
   [queue]
@@ -94,37 +91,31 @@
       (if (or (is-note-on message) (is-note-off message))
         (.put queue message)))))
 
-(defn wire-up "" [midi-device-to-use]
-  (let [transmitter (.getTransmitter midi-device-to-use)
-        receiver1 (printing-receiver "MIDI Receiver for Printing Messages")
+(defn midi-start
+  "Start listening for event on every available input MidiDevice and return a LinkedBlockingQueue that messages will be put into."
+  []
+  (let [message-queue (LinkedBlockingQueue.)
         receiver (queueing-receiver message-queue)]
-    (.setReceiver transmitter receiver)))
+    (doall (map #(do (println "Opening MIDI input device" (.getName (.getDeviceInfo %1)))
+                     (.setReceiver (.getTransmitter %1) receiver)
+                     (.open %1))
+         (midi-inputs)))
+    ; For handing events off to the main thread.
+    message-queue))
 
-(defn start []
-  (wire-up input1)
-  (wire-up input2)
-  (.open input1)
-  (.open input2))
-
-(defn stop []
-  (.close input1)
-  (.close input2))
+(defn midi-stop
+  "Shut down all input MidiDevice objects to stop their worker threads that would keep the JVM running after exit."
+  []
+  (doall (map #(.close %1) (midi-inputs))))
 
 (defn -main
   "Print out incoming MIDI note events until there's a 5 second pause between events, then exit."
   [& args]
-  (println "Hello, World!")
-  (let [runtime (Runtime/getRuntime)
-        freeMem (.freeMemory runtime)
-        totalMem (.totalMemory runtime)
-        cores (.availableProcessors runtime)]
-    (midi-devices)
-    (prn #{1 2 "Hello" (vector 'free freeMem) ['cores cores] {'total totalMem}}))
-    (start)
+  (let [message-queue (midi-start)]
     ; Wait as long as needed for the first message.
+    (println "Waiting for first note...")
     (let [message (.take message-queue)]
       (midi-message-show message))
-    (println "Got first message")
     ; Loop until we timeout waiting for a new message.
     (loop [n 0]
       (let [message (.poll message-queue 5 TimeUnit/SECONDS)]
@@ -132,5 +123,6 @@
           nil
           (do
             (midi-message-show message)
-            (recur n)))))
-    (stop))
+            (recur n))))))
+  (println "No notes detected for 5 seconds, exiting...")
+  (midi-stop))
