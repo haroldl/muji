@@ -18,7 +18,8 @@ FIXME: listing of options this app accepts.
 
 ## Examples
 
-...
+    lein repl
+    (use 'muji.core :reload)
 
 ### Bugs
 
