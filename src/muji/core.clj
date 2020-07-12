@@ -15,9 +15,11 @@
 (defn format-midi-note-for-lilypond
   ""
   [note]
-  ; TODO: A, A#, and B are treated as one octave higher by LilyPond which is
-  ;       C centric. Need to adjust for that.
-  (str (name (note :pitch)) (format-octave (note :octave))))
+  (let [pitch (note :pitch)
+        ; A, A#, and B are treated as one octave higher by LilyPond which is
+        ; C centric. Need to adjust for that.
+        octave (- (note :octave) (if (contains? #{:a :as :b} pitch) 1 0))]
+    (str (name pitch) (format-octave octave))))
 
 (defn format-for-lilypond
   "Each input element is a list of notes that happened together, output is a string for that note or chord for showing in LilyPond."
