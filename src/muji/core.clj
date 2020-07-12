@@ -1,9 +1,8 @@
 (ns muji.core
   (:gen-class)
   (:use [muji.midi :only [midi-start midi-stop midi-note-show]])
-  (:use [muji.lily]))
-
-(import 'java.util.concurrent.TimeUnit)
+  (:use [muji.lily])
+  (:import (java.util.concurrent TimeUnit)))
 
 (defn -main
   "Print out incoming MIDI note events until there's a 5 second pause between events, then exit."
