@@ -12,6 +12,27 @@
              :data1 (.getData1 message)
              :data2 (.getData2 message) }))
 
+(defn is-note-on [message]
+  (and
+    (instance? ShortMessage message)
+    (<= 144 (.getCommand message) 159)))
+
+(defn is-note-off [message]
+  (and
+    (instance? ShortMessage message)
+    (<= 128 (.getCommand message) 143)))
+
+(defn midi-note-show
+  "Print the pitch and octave of a note-on event, for example :c 4"
+  [message]
+  (if (is-note-on message)
+    ; Adjust to make A4 = 48 so that pitch and octave work out.
+    (let [adjusted-note (- (.getData1 message) 9)
+          pitch-num (rem adjusted-note 12)
+          pitch ([:a :as :b :c :cs :d :ds :e :f :fs :g :gs] pitch-num)
+          octave (quot adjusted-note 12)]
+      (println pitch octave))))
+
 (defn midi-device-info-show
   "Pretty print the details of a MidiDevice.Info"
   [midi-device-info]
@@ -61,16 +82,6 @@
   (first
     (filter #(= device-name (.getName (.getDeviceInfo %1))) (midi-inputs))))
 
-(defn is-note-on [message]
-  (and
-    (instance? ShortMessage message)
-    (<= 144 (.getCommand message) 159)))
-
-(defn is-note-off [message]
-  (and
-    (instance? ShortMessage message)
-    (<= 128 (.getCommand message) 143)))
-
 (defn printing-receiver
   "Create a Receiver that prints each MidiMessage it receives."
   [name]
@@ -115,14 +126,16 @@
     ; Wait as long as needed for the first message.
     (println "Waiting for first note...")
     (let [message (.take message-queue)]
-      (midi-message-show message))
+      ;(midi-message-show message)
+      (midi-note-show message))
     ; Loop until we timeout waiting for a new message.
     (loop [n 0]
       (let [message (.poll message-queue 5 TimeUnit/SECONDS)]
         (if (nil? message)
           nil
           (do
-            (midi-message-show message)
+            ;(midi-message-show message)
+            (midi-note-show message)
             (recur n))))))
   (println "No notes detected for 5 seconds, exiting...")
   (midi-stop))

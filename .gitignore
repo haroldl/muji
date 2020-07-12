@@ -6,6 +6,7 @@ pom.xml
 pom.xml.asc
 *.jar
 *.class
+*.pdf
 /.lein-*
 /.nrepl-port
 /.prepl-port
