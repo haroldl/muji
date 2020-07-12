@@ -1,37 +1,38 @@
 # muji
 
-FIXME: description
+The goal is to use a MIDI keyboard to enter music for typesetting
+via LilyPond.
 
-## Installation
-
-Download from http://example.com/FIXME.
+Currently, muji reads incoming MIDI events and generate a LilyPond file for the
+music and then (on Windows) opens the generated PDF.
 
 ## Usage
 
-FIXME: explanation
+Make sure `lilypond` is on your `PATH`.
 
-    $ java -jar muji-0.1.0-standalone.jar [args]
+The output is written currently to `temp.ly` and `temp.pdf`.
 
-## Options
+Start up muji and it will wait for you to start playing. Then it will continue
+to record until there is a 5 second delay. At that point it will write the
+LilyPond file, create the PDF version and open the PDF.
 
-FIXME: listing of options this app accepts.
+    $ java -jar muji-0.1.0-standalone.jar
 
 ## Examples
 
+    lein run
     lein repl
     (use 'muji.core :reload)
 
-### Bugs
+### Future plans
 
-...
-
-### Any Other Sections
-### That You Think
-### Might be Useful
+Rhythm: different duration for notes based on length.
+Bass clef for low notes and guess which hand is where.
+Tempo inference.
 
 ## License
 
-Copyright © 2020 FIXME
+Copyright © 2020 Harold Lee
 
 This program and the accompanying materials are made available under the
 terms of the Eclipse Public License 2.0 which is available at
