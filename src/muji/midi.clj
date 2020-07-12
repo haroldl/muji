@@ -22,16 +22,24 @@
     (instance? ShortMessage message)
     (<= 128 (.getCommand message) 143)))
 
-(defn midi-note-show
-  "Print the pitch and octave of a note-on event, for example :c 4"
-  [message]
-  (if (is-note-on message)
-    ; Adjust to make A4 = 48 so that pitch and octave work out.
-    (let [adjusted-note (- (.getData1 message) 9)
-          pitch-num (rem adjusted-note 12)
-          pitch ([:a :as :b :c :cs :d :ds :e :f :fs :g :gs] pitch-num)
-          octave (quot adjusted-note 12)]
-      (println pitch octave))))
+(defn parse-midi-note
+  "Determine the pitch and octave of a note-on or note-off event."
+  [message timestamp]
+  (let [is-on (is-note-on message) is-off (is-note-off message)]
+    (if (or is-on is-off)
+      ; Adjust to make A4 = 48 so that pitch and octave work out.
+      (let [adjusted-note (- (.getData1 message) 9)
+            pitch-num (rem adjusted-note 12)
+            ; Use pitch names that are LilyPond friendly.
+            pitch ([:a :ais :b :c :cis :d :dis :e :f :fis :g :gis] pitch-num)
+            octave (quot adjusted-note 12)
+            velocity (.getData2 message)]
+        { :pitch pitch
+          :octave octave
+          :timestamp timestamp
+          :is-note-on is-on
+          :velocity velocity })
+      nil)))
 
 (defn midi-device-info-show
   "Pretty print the details of a MidiDevice.Info"
@@ -98,9 +106,11 @@
   (reify Receiver
     (close [this] nil)
     (send [this message timestamp]
-      ; NB: My Roland keyboard sends a midi event with command 240 on channel 14 at about 120 bpm.
-      (if (or (is-note-on message) (is-note-off message))
-        (.put queue message)))))
+      ; NB: My Roland keyboard sends a midi event with command 240 on channel 14
+      ;    at about 120 bpm... but the parse function will return nil for that.
+      (let [data (parse-midi-note message timestamp)]
+        (if (not (nil? data))
+          (.put queue data))))))
 
 (defn midi-start
   "Start listening for event on every available input MidiDevice and return a LinkedBlockingQueue that messages will be put into."
